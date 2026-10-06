@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bóveda IA</title>
+<style>
+:root {
+  --bg: #0b0d10; --surface: #12151a; --surface-2: #181c22; --border: rgba(255,255,255,.09);
+  --text: #eef1f4; --text-2: #9aa4b2; --text-3: #6b7480;
+  --accent: #7ee0b8; --accent-hover: #a2ecd0; --accent-ink: #062018;
+  --ok: #7ee0b8; --info: #8fb8ff; --warn: #f2c26b; --danger: #ff8a80;
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 64px;
+  --radius-sm: 6px; --radius-md: 10px; --container: 1280px;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 16px; line-height: 1.5; }
+a { color: var(--accent); }
+.container { max-width: var(--container); margin-inline: auto; padding-inline: var(--space-5); }
+.mono { font-family: var(--mono); font-size: 13px; }
+.muted { color: var(--text-2); }
+.hidden { display: none !important; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Buttons & inputs */
+.btn { display: inline-flex; align-items: center; gap: var(--space-2); border: 1px solid transparent; border-radius: var(--radius-sm);
+  padding: 10px 16px; font: 600 14px var(--font); cursor: pointer; transition: background .15s, border-color .15s, transform .15s; }
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-primary:hover { background: var(--accent-hover); }
+.btn-ghost { background: transparent; color: var(--text); border-color: var(--border); }
+.btn-ghost:hover { border-color: var(--text-3); }
+.btn-danger { background: transparent; color: var(--danger); border-color: rgba(255,138,128,.35); }
+.btn-sm { padding: 6px 10px; font-size: 13px; }
+.btn:disabled { opacity: .5; cursor: progress; }
+label { display: block; font-size: 13px; color: var(--text-2); margin-bottom: var(--space-2); }
+input, select { width: 100%; background: var(--surface-2); color: var(--text); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px; font: 15px var(--font); }
+input:focus, select:focus { border-color: var(--accent); outline: none; }
+.field { margin-bottom: var(--space-4); }
+.form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: var(--space-3); align-items: end; }
+
+/* Login */
+.login { min-height: 100vh; display: grid; grid-template-columns: 1.2fr 1fr; }
+.login-hero { padding: var(--space-8); display: flex; flex-direction: column; justify-content: center; border-right: 1px solid var(--border); }
+.eyebrow { font: 600 12px var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: var(--space-4); }
+.display { font-size: clamp(2.4rem, 5vw, 4.4rem); line-height: 1.02; letter-spacing: -.03em; margin: 0 0 var(--space-5); font-weight: 700; }
+.lead { font-size: 18px; color: var(--text-2); max-width: 520px; margin: 0; }
+.specs { display: flex; gap: var(--space-6); margin-top: var(--space-7); flex-wrap: wrap; }
+.spec strong { display: block; font: 600 20px var(--mono); }
+.spec span { font-size: 13px; color: var(--text-3); }
+.login-form { padding: var(--space-8); display: flex; flex-direction: column; justify-content: center; max-width: 460px; width: 100%; margin-inline: auto; }
+.login-form h2 { font-size: 28px; margin: 0 0 var(--space-2); }
+
+/* App shell */
+header.nav { position: sticky; top: 0; z-index: 10; background: rgba(11,13,16,.85); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
+.nav-inner { display: flex; align-items: center; gap: var(--space-6); height: 64px; }
+.brand { font-weight: 700; letter-spacing: -.01em; display: flex; align-items: center; gap: var(--space-2); }
+.brand-mark { width: 22px; height: 22px; border-radius: 5px; background: var(--accent); display: grid; place-items: center; color: var(--accent-ink); font: 700 12px var(--mono); }
+.tabs { display: flex; gap: var(--space-1); flex: 1; }
+.tab { background: none; border: none; color: var(--text-2); padding: 8px 12px; border-radius: var(--radius-sm); font: 500 14px var(--font); cursor: pointer; }
+.tab:hover { color: var(--text); }
+.tab[aria-selected="true"] { color: var(--text); background: var(--surface-2); }
+.user-chip { font-size: 13px; color: var(--text-2); display: flex; align-items: center; gap: var(--space-3); }
+main { padding-block: var(--space-7) var(--space-8); }
+.page-head { display: flex; justify-content: space-between; align-items: flex-end; gap: var(--space-5); margin-bottom: var(--space-6); flex-wrap: wrap; }
+.page-head h1 { font-size: clamp(1.8rem, 3.5vw, 2.6rem); letter-spacing: -.02em; margin: 0 0 var(--space-2); }
+.page-head p { margin: 0; color: var(--text-2); }
+
+/* KPIs */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; margin-bottom: var(--space-6); }
+.kpi { background: var(--surface); padding: var(--space-5); }
+.kpi .value { font: 600 30px var(--mono); }
+.kpi .label { font-size: 13px; color: var(--text-3); }
+
+/* Dropzone */
+.dropzone { border: 1px dashed var(--text-3); border-radius: var(--radius-md); padding: var(--space-6); text-align: center; color: var(--text-2); cursor: pointer; transition: border-color .15s, background .15s; margin-bottom: var(--space-6); }
+.dropzone:hover, .dropzone.drag { border-color: var(--accent); background: rgba(126,224,184,.04); }
+.dropzone strong { color: var(--text); }
+
+/* Table */
+.table-wrap { border: 1px solid var(--border); border-radius: var(--radius-md); overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { text-align: left; font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tbody tr { cursor: pointer; transition: background .12s; }
+tbody tr:hover { background: var(--surface); }
+td.num { text-align: right; font-family: var(--mono); font-size: 13px; }
+.badge { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--mono); padding: 3px 8px; border-radius: 4px; background: var(--surface-2); white-space: nowrap; }
+.badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.lvl-publico { color: var(--ok); } .lvl-interno { color: var(--info); } .lvl-confidencial { color: var(--warn); } .lvl-restringido { color: var(--danger); }
+.ok { color: var(--ok); } .fail { color: var(--danger); }
+
+/* Drawer */
+.drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 20; }
+.drawer { position: fixed; top: 0; right: 0; height: 100vh; width: min(560px, 100vw); background: var(--surface); border-left: 1px solid var(--border); z-index: 21; overflow-y: auto; padding: var(--space-6); }
+.drawer h2 { margin: 0 0 var(--space-2); font-size: 22px; word-break: break-word; }
+.drawer section { margin-top: var(--space-6); }
+.drawer h3 { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .1em; color: var(--text-3); margin: 0 0 var(--space-3); }
+.kv { display: grid; grid-template-columns: 140px 1fr; gap: var(--space-2) var(--space-4); font-size: 14px; }
+.kv dt { color: var(--text-3); } .kv dd { margin: 0; word-break: break-all; }
+.bar { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+.bar > span { display: block; height: 100%; background: var(--accent); }
+.finding { padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+.finding:last-child { border-bottom: none; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.chip { font: 12px var(--mono); background: var(--surface-2); padding: 3px 8px; border-radius: 4px; color: var(--text-2); }
+.actions { display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-5); }
+
+/* Empty / toast */
+.empty { text-align: center; padding: var(--space-8) var(--space-5); color: var(--text-2); }
+.empty h3 { color: var(--text); font-size: 20px; margin: 0 0 var(--space-2); }
+.toast { position: fixed; bottom: var(--space-5); left: 50%; transform: translateX(-50%); background: var(--surface-2); border: 1px solid var(--border); padding: 12px 18px; border-radius: var(--radius-sm); z-index: 30; font-size: 14px; max-width: 90vw; }
+.toast.error { border-color: rgba(255,138,128,.5); color: var(--danger); }
+.panel { border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-5); margin-bottom: var(--space-6); background: var(--surface); }
+.panel h2 { font-size: 18px; margin: 0 0 var(--space-4); }
+
+@media (max-width: 900px) {
+  .login { grid-template-columns: 1fr; }
+  .login-hero { border-right: none; border-bottom: 1px solid var(--border); padding: var(--space-7) var(--space-5); }
+  .login-form { padding: var(--space-7) var(--space-5); }
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .nav-inner { gap: var(--space-3); height: auto; padding-block: var(--space-3); flex-wrap: wrap; }
+  .tabs { order: 3; width: 100%; overflow-x: auto; }
+  .container { padding-inline: var(--space-4); }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="login-view" class="login">
+  <section class="login-hero" aria-labelledby="hero-title">
+    <div class="eyebrow">Gestión documental segura</div>
+    <h1 id="hero-title" class="display">Tus documentos,<br>cifrados y entendidos.</h1>
+    <p class="lead">Cifrado en reposo con llave por documento, control de acceso por roles e inteligencia artificial que clasifica y detecta datos sensibles al subir cada archivo.</p>
+    <div class="specs">
+      <div class="spec"><strong>AES-256-GCM</strong><span>Cifrado de sobre por documento</span></div>
+      <div class="spec"><strong>RBAC</strong><span>Admin · Editor · Lector</span></div>
+      <div class="spec"><strong>IA</strong><span>Clasificación + datos sensibles</span></div>
+    </div>
+  </section>
+  <section class="login-form" aria-labelledby="login-title">
+    <h2 id="login-title">Iniciar sesión</h2>
+    <p class="muted" style="margin:0 0 var(--space-6)">Accede a tu bóveda.</p>
+    <form id="login-form" novalidate>
+      <div class="field"><label for="login-user">Usuario</label><input id="login-user" autocomplete="username" required></div>
+      <div class="field"><label for="login-pass">Contraseña</label><input id="login-pass" type="password" autocomplete="current-password" required></div>
+      <p id="login-error" class="fail hidden" role="alert" style="font-size:14px"></p>
+      <button class="btn btn-primary" type="submit" style="width:100%;justify-content:center">Entrar →</button>
+    </form>
+  </section>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app-view" class="hidden">
+  <header class="nav">
+    <div class="container nav-inner">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">B</span>Bóveda IA</div>
+      <nav class="tabs" role="tablist" aria-label="Secciones">
+        <button class="tab" role="tab" data-tab="documents" aria-selected="true">Documentos</button>
+        <button class="tab" role="tab" data-tab="analyze" aria-selected="false">Analizar con IA</button>
+        <button class="tab admin-only" role="tab" data-tab="users" aria-selected="false">Usuarios</button>
+        <button class="tab admin-only" role="tab" data-tab="audit" aria-selected="false">Bitácora</button>
+      </nav>
+      <div class="user-chip"><span id="who"></span><button class="btn btn-ghost btn-sm" id="logout">Salir</button></div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Documents -->
+    <section id="tab-documents" aria-labelledby="docs-title">
+      <div class="page-head">
+        <div><h1 id="docs-title">Documentos</h1><p>Todo se cifra antes de guardarse. La IA analiza el contenido solo en memoria.</p></div>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <div class="dropzone uploader-only" id="dropzone" tabindex="0" role="button" aria-label="Subir documento">
+        <strong>Arrastra un archivo aquí</strong> o haz clic para seleccionarlo<br>
+        <span class="mono muted">.txt · .md · .csv · .pdf · .docx — máx. 10 MB</span>
+        <input type="file" id="file-input" class="hidden" accept=".txt,.md,.csv,.pdf,.docx">
+      </div>
+      <div id="docs-table"></div>
+    </section>
+
+    <!-- Analyze -->
+    <section id="tab-analyze" class="hidden" aria-labelledby="an-title">
+      <div class="page-head"><div><h1 id="an-title">Analizar con IA</h1><p>Prueba la clasificación y la detección de datos sensibles sin guardar el archivo.</p></div></div>
+      <div class="panel">
+        <div class="form-row">
+          <div><label for="analyze-input">Archivo</label><input type="file" id="analyze-input" accept=".txt,.md,.csv,.pdf,.docx"></div>
+          <div><button class="btn btn-primary" id="analyze-btn">Analizar</button></div>
+        </div>
+      </div>
+      <div id="analyze-result"></div>
+    </section>
+
+    <!-- Users -->
+    <section id="tab-users" class="hidden" aria-labelledby="us-title">
+      <div class="page-head"><div><h1 id="us-title">Usuarios y roles</h1><p>Admin: control total · Editor: sube y comparte · Lector: solo lo que le comparten.</p></div></div>
+      <form class="panel" id="user-form">
+        <h2>Nuevo usuario</h2>
+        <div class="form-row">
+          <div><label for="nu-user">Usuario</label><input id="nu-user" required></div>
+          <div><label for="nu-name">Nombre completo</label><input id="nu-name"></div>
+          <div><label for="nu-pass">Contraseña</label><input id="nu-pass" type="password" required></div>
+          <div><label for="nu-role">Rol</label><select id="nu-role"><option value="viewer">Lector</option><option value="editor">Editor</option><option value="admin">Administrador</option></select></div>
+          <div><button class="btn btn-primary" type="submit">Crear</button></div>
+        </div>
+        <p class="muted" style="font-size:13px;margin:var(--space-3) 0 0">Mínimo 8 caracteres con mayúscula, minúscula, número y símbolo.</p>
+      </form>
+      <div id="users-table"></div>
+    </section>
+
+    <!-- Audit -->
+    <section id="tab-audit" class="hidden" aria-labelledby="au-title">
+      <div class="page-head">
+        <div><h1 id="au-title">Bitácora de accesos</h1><p>Registro de cada inicio de sesión, descarga, acceso denegado y cambio de permisos.</p></div>
+        <label style="display:flex;gap:8px;align-items:center;margin:0"><input type="checkbox" id="only-failed" style="width:auto"> Solo fallidos</label>
+      </div>
+      <div id="audit-table"></div>
+    </section>
+  </main>
+</div>
+
+<div id="drawer-root"></div>
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+<script src="config.js"></script>
+<script>
+const API_BASE = (window.VAULT_API_URL || "").replace(/\/$/, "");
+const state = { token: null, user: null, users: [] };
+const SENSITIVITY_LABELS = { publico: "Público", interno: "Interno", confidencial: "Confidencial", restringido: "Restringido" };
+const ROLE_LABELS = { admin: "Administrador", editor: "Editor", viewer: "Lector" };
+const ACTION_LABELS = { login: "Inicio de sesión", upload: "Subida", download: "Descarga", view: "Consulta", share: "Compartir",
+  revoke: "Revocar", delete: "Eliminar", user_create: "Crear usuario", user_update: "Editar usuario", view_permissions: "Ver permisos" };
+const $ = (sel) => document.querySelector(sel);
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / 1048576).toFixed(1) + " MB";
+}
+function formatDate(iso) { return new Date(iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z").toLocaleString("es-CO"); }
+function sensitivityBadge(level) { return `<span class="badge lvl-${level}">${SENSITIVITY_LABELS[level] || level}</span>`; }
+function showToast(message, isError = false) {
+  const toast = $("#toast");
+  toast.textContent = message;
+  toast.className = "toast" + (isError ? " error" : "");
+  clearTimeout(showToast.timer);
+  showToast.timer = setTimeout(() => toast.classList.add("hidden"), 3500);
+}
+
+async function api(path, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (state.token) headers.Authorization = "Bearer " + state.token;
+  if (options.json) { headers["Content-Type"] = "application/json"; options.body = JSON.stringify(options.json); }
+  const response = await fetch(API_BASE + path, { ...options, headers });
+  if (response.status === 401 && state.token) { logout(); throw new Error("Tu sesión expiró. Inicia sesión de nuevo."); }
+  if (!response.ok) {
+    let detail = "Error " + response.status;
+    try { const body = await response.json(); detail = typeof body.detail === "string" ? body.detail : "Datos inválidos: revisa el formulario."; } catch {}
+    throw new Error(detail);
+  }
+  if (options.raw) return response;
+  return response.status === 204 ? null : response.json();
+}
+
+/* ---------- Auth ---------- */
+$("#login-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const errorBox = $("#login-error");
+  errorBox.classList.add("hidden");
+  const body = new URLSearchParams({ username: $("#login-user").value.trim(), password: $("#login-pass").value });
+  const submitButton = event.target.querySelector("button[type=submit]");
+  submitButton.disabled = true;
+  // Free hosting puts the API to sleep; the first request can take up to a minute.
+  const wakeTimer = setTimeout(() => { submitButton.textContent = "Despertando el servidor… (hasta 1 min)"; }, 3000);
+  try {
+    const data = await api("/api/auth/login", { method: "POST", body });
+    state.token = data.access_token;
+    state.user = { username: data.username, role: data.role };
+    $("#login-pass").value = "";
+    enterApp();
+  } catch (error) {
+    errorBox.textContent = error instanceof TypeError ? "No se pudo conectar con el servidor. Revisa la URL de la API o intenta de nuevo." : error.message;
+    errorBox.classList.remove("hidden");
+  } finally {
+    clearTimeout(wakeTimer);
+    submitButton.disabled = false;
+    submitButton.textContent = "Entrar →";
+  }
+});
+function logout() { state.token = null; state.user = null; $("#app-view").classList.add("hidden"); $("#login-view").classList.remove("hidden"); closeDrawer(); }
+$("#logout").addEventListener("click", logout);
+
+function enterApp() {
+  $("#login-view").classList.add("hidden");
+  $("#app-view").classList.remove("hidden");
+  $("#who").innerHTML = `<span class="mono">${escapeHtml(state.user.username)}</span> · ${ROLE_LABELS[state.user.role]}`;
+  document.querySelectorAll(".admin-only").forEach((el) => el.classList.toggle("hidden", state.user.role !== "admin"));
+  document.querySelectorAll(".uploader-only").forEach((el) => el.classList.toggle("hidden", state.user.role === "viewer"));
+  if (state.user.role !== "viewer") api("/api/users").then((u) => (state.users = u)).catch(() => {});
+  switchTab("documents");
+}
+
+/* ---------- Tabs ---------- */
+function switchTab(name) {
+  document.querySelectorAll(".tab").forEach((t) => t.setAttribute("aria-selected", t.dataset.tab === name));
+  ["documents", "analyze", "users", "audit"].forEach((t) => $("#tab-" + t).classList.toggle("hidden", t !== name));
+  ({ documents: loadDocuments, users: loadUsers, audit: loadAudit, analyze: () => {} })[name]();
+}
+document.querySelectorAll(".tab").forEach((tab) => tab.addEventListener("click", () => switchTab(tab.dataset.tab)));
+
+/* ---------- Documents ---------- */
+async function loadDocuments() {
+  $("#docs-table").innerHTML = `<p class="muted">Cargando documentos…</p>`;
+  try {
+    const documents = await api("/api/documents");
+    renderKpis(documents);
+    if (!documents.length) {
+      $("#docs-table").innerHTML = `<div class="empty"><h3>Aún no hay documentos</h3><p>${state.user.role === "viewer"
+        ? "Cuando alguien comparta un documento contigo aparecerá aquí."
+        : "Sube tu primer archivo: se cifrará y la IA lo clasificará automáticamente."}</p></div>`;
+      return;
+    }
+    const rows = documents.map((d) => `
+      <tr data-id="${d.id}" tabindex="0">
+        <td>${escapeHtml(d.original_name)}<div class="muted mono" style="font-size:12px">${escapeHtml(d.owner_username)}</div></td>
+        <td>${escapeHtml(d.category)}</td>
+        <td>${sensitivityBadge(d.sensitivity)}</td>
+        <td class="num">${d.risk_score}</td>
+        <td class="num">${formatBytes(d.size_bytes)}</td>
+        <td class="mono muted">${formatDate(d.uploaded_at)}</td>
+      </tr>`).join("");
+    $("#docs-table").innerHTML = `<div class="table-wrap"><table>
+      <thead><tr><th>Documento</th><th>Categoría IA</th><th>Sensibilidad</th><th style="text-align:right">Riesgo</th><th style="text-align:right">Tamaño</th><th>Subido</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`;
+    document.querySelectorAll("#docs-table tbody tr").forEach((row) => {
+      const open = () => openDocument(documents.find((d) => d.id === row.dataset.id));
+      row.addEventListener("click", open);
+      row.addEventListener("keydown", (e) => { if (e.key === "Enter") open(); });
+    });
+  } catch (error) {
+    $("#docs-table").innerHTML = `<div class="empty"><h3>No se pudieron cargar los documentos</h3><p>${escapeHtml(error.message)}</p></div>`;
+  }
+}
+
+function renderKpis(documents) {
+  const count = (level) => documents.filter((d) => d.sensitivity === level).length;
+  const sensitive = count("confidencial") + count("restringido");
+  const totalBytes = documents.reduce((sum, d) => sum + d.size_bytes, 0);
+  const categories = new Set(documents.map((d) => d.category)).size;
+  $("#kpis").innerHTML = [
+    [documents.length, "Documentos cifrados"],
+    [sensitive, "Confidenciales o restringidos"],
+    [categories, "Categorías detectadas"],
+    [formatBytes(totalBytes), "Volumen protegido"],
+  ].map(([value, label]) => `<div class="kpi"><div class="value">${value}</div><div class="label">${label}</div></div>`).join("");
+}
+
+async function uploadFile(file) {
+  if (!file) return;
+  const dropzone = $("#dropzone");
+  dropzone.innerHTML = `<strong>Cifrando y analizando “${escapeHtml(file.name)}”…</strong>`;
+  const form = new FormData();
+  form.append("file", file);
+  try {
+    const doc = await api("/api/documents", { method: "POST", body: form });
+    showToast(`Cifrado ✓ — ${doc.category} · ${SENSITIVITY_LABELS[doc.sensitivity]}`);
+    await loadDocuments();
+    openDocument(doc);
+  } catch (error) { showToast(error.message, true); }
+  finally { resetDropzone(); }
+}
+function resetDropzone() {
+  $("#dropzone").innerHTML = `<strong>Arrastra un archivo aquí</strong> o haz clic para seleccionarlo<br>
+    <span class="mono muted">.txt · .md · .csv · .pdf · .docx — máx. 10 MB</span>
+    <input type="file" id="file-input" class="hidden" accept=".txt,.md,.csv,.pdf,.docx">`;
+  $("#file-input").addEventListener("change", (e) => uploadFile(e.target.files[0]));
+}
+const dropzone = $("#dropzone");
+dropzone.addEventListener("click", (e) => { if (e.target.id !== "file-input") $("#file-input").click(); });
+dropzone.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("#file-input").click(); } });
+dropzone.addEventListener("dragover", (e) => { e.preventDefault(); dropzone.classList.add("drag"); });
+dropzone.addEventListener("dragleave", () => dropzone.classList.remove("drag"));
+dropzone.addEventListener("drop", (e) => { e.preventDefault(); dropzone.classList.remove("drag"); uploadFile(e.dataTransfer.files[0]); });
+resetDropzone();
+
+/* ---------- Analysis rendering (shared by drawer and analyze tab) ---------- */
+function renderFindings(findings) {
+  const entries = Object.values(findings || {});
+  if (!entries.length) return `<p class="muted">No se detectaron datos sensibles.</p>`;
+  return entries.map((f) => `<div class="finding"><strong>${escapeHtml(f.label)}</strong> <span class="muted mono">×${f.count}</span>
+    <div class="chips" style="margin-top:6px">${f.samples.map((s) => `<span class="chip">${escapeHtml(s)}</span>`).join("")}</div></div>`).join("");
+}
+function renderScores(scores) {
+  return Object.entries(scores || {}).slice(0, 4).map(([label, p]) => `
+    <div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:14px"><span>${escapeHtml(label)}</span><span class="mono">${(p * 100).toFixed(1)}%</span></div>
+    <div class="bar"><span style="width:${p * 100}%"></span></div></div>`).join("");
+}
+
+/* ---------- Drawer (document detail) ---------- */
+function closeDrawer() { $("#drawer-root").innerHTML = ""; }
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
+
+function openDocument(doc) {
+  const canManage = doc.my_access === "manage";
+  $("#drawer-root").innerHTML = `
+    <div class="drawer-backdrop" id="backdrop"></div>
+    <aside class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <div style="display:flex;justify-content:space-between;gap:16px;align-items:flex-start">
+        <h2 id="drawer-title">${escapeHtml(doc.original_name)}</h2>
+        <button class="btn btn-ghost btn-sm" id="close-drawer" aria-label="Cerrar">✕</button>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${sensitivityBadge(doc.sensitivity)}<span class="badge" style="color:var(--text-2)">${escapeHtml(doc.category)} · ${(doc.category_confidence * 100).toFixed(0)}%</span></div>
+      <div class="actions">
+        <button class="btn btn-primary" id="dl-btn">Descargar ↓</button>
+        ${canManage && state.user.role !== "viewer" ? `<button class="btn btn-danger" id="del-btn">Eliminar</button>` : ""}
+      </div>
+      <section><h3>Datos sensibles detectados · riesgo ${doc.risk_score}/100</h3>${renderFindings(doc.sensitive_findings)}</section>
+      <section><h3>Palabras clave</h3><div class="chips">${(doc.keywords || []).map((k) => `<span class="chip">${escapeHtml(k)}</span>`).join("") || '<span class="muted">—</span>'}</div></section>
+      <section><h3>Seguridad</h3><dl class="kv">
+        <dt>Cifrado</dt><dd>AES-256-GCM · llave por documento</dd>
+        <dt>SHA-256</dt><dd class="mono">${doc.sha256}</dd>
+        <dt>ID</dt><dd class="mono">${doc.id}</dd>
+        <dt>Propietario</dt><dd>${escapeHtml(doc.owner_username)}</dd>
+        <dt>Tu acceso</dt><dd>${canManage ? "Gestionar" : "Lectura"}</dd>
+      </dl></section>
+      ${canManage && state.user.role !== "viewer" ? `
+      <section><h3>Compartir</h3>
+        <form id="share-form" class="form-row">
+          <div><label for="share-target">Usuario o rol</label><select id="share-target">
+            <optgroup label="Roles">${Object.entries(ROLE_LABELS).map(([v, l]) => `<option value="role:${v}">Todos los ${l.toLowerCase()}es</option>`).join("")}</optgroup>
+            <optgroup label="Usuarios">${state.users.filter((u) => u.id !== doc.owner_id).map((u) => `<option value="user:${escapeHtml(u.username)}">${escapeHtml(u.username)} (${ROLE_LABELS[u.role]})</option>`).join("")}</optgroup>
+          </select></div>
+          <div><label for="share-level">Permiso</label><select id="share-level"><option value="read">Lectura</option><option value="manage">Gestionar</option></select></div>
+          <div><button class="btn btn-ghost" type="submit">Compartir</button></div>
+        </form>
+        <div id="perm-list" style="margin-top:12px"></div>
+      </section>` : ""}
+    </aside>`;
+  $("#backdrop").addEventListener("click", closeDrawer);
+  $("#close-drawer").addEventListener("click", closeDrawer);
+  $("#close-drawer").focus();
+  $("#dl-btn").addEventListener("click", () => downloadDocument(doc));
+  if ($("#del-btn")) $("#del-btn").addEventListener("click", () => deleteDocument(doc));
+  if ($("#share-form")) {
+    loadPermissions(doc);
+    $("#share-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const [kind, value] = $("#share-target").value.split(":");
+      const json = { access_level: $("#share-level").value, [kind === "user" ? "username" : "role"]: value };
+      try { await api(`/api/documents/${doc.id}/share`, { method: "POST", json }); showToast("Acceso concedido ✓"); loadPermissions(doc); }
+      catch (error) { showToast(error.message, true); }
+    });
+  }
+}
+
+async function loadPermissions(doc) {
+  const box = $("#perm-list");
+  try {
+    const permissions = await api(`/api/documents/${doc.id}/permissions`);
+    if (!permissions.length) { box.innerHTML = `<p class="muted" style="font-size:14px">Solo tú (y los administradores) tienen acceso.</p>`; return; }
+    const nameOf = (p) => p.user_id ? (state.users.find((u) => u.id === p.user_id)?.username || "usuario " + p.user_id) : "Rol: " + ROLE_LABELS[p.role];
+    box.innerHTML = permissions.map((p) => `<div class="finding" style="display:flex;justify-content:space-between;align-items:center">
+      <span>${escapeHtml(nameOf(p))} <span class="muted mono">${p.access_level === "manage" ? "gestionar" : "lectura"}</span></span>
+      <button class="btn btn-danger btn-sm" data-perm="${p.id}">Revocar</button></div>`).join("");
+    box.querySelectorAll("[data-perm]").forEach((btn) => btn.addEventListener("click", async () => {
+      try { await api(`/api/documents/${doc.id}/permissions/${btn.dataset.perm}`, { method: "DELETE" }); showToast("Acceso revocado"); loadPermissions(doc); }
+      catch (error) { showToast(error.message, true); }
+    }));
+  } catch (error) { box.innerHTML = `<p class="fail">${escapeHtml(error.message)}</p>`; }
+}
+
+async function downloadDocument(doc) {
+  try {
+    const response = await api(`/api/documents/${doc.id}/download`, { raw: true });
+    const url = URL.createObjectURL(await response.blob());
+    const link = Object.assign(document.createElement("a"), { href: url, download: doc.original_name });
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast("Descifrado e integridad verificada ✓");
+  } catch (error) { showToast(error.message, true); }
+}
+
+async function deleteDocument(doc) {
+  if (!confirm(`¿Eliminar definitivamente “${doc.original_name}”? Se borrará el archivo cifrado.`)) return;
+  try { await api(`/api/documents/${doc.id}`, { method: "DELETE" }); closeDrawer(); showToast("Documento eliminado"); loadDocuments(); }
+  catch (error) { showToast(error.message, true); }
+}
+
+/* ---------- Analyze tab ---------- */
+$("#analyze-btn").addEventListener("click", async () => {
+  const file = $("#analyze-input").files[0];
+  if (!file) { showToast("Selecciona un archivo para analizar.", true); return; }
+  const button = $("#analyze-btn");
+  button.disabled = true; button.textContent = "Analizando…";
+  const form = new FormData(); form.append("file", file);
+  try {
+    const r = await api("/api/documents/analyze", { method: "POST", body: form });
+    $("#analyze-result").innerHTML = `
+      <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+        <div class="kpi"><div class="value" style="font-size:22px">${escapeHtml(r.category)}</div><div class="label">Categoría · ${(r.category_confidence * 100).toFixed(1)}% confianza</div></div>
+        <div class="kpi"><div class="value" style="font-size:22px">${sensitivityBadge(r.sensitivity)}</div><div class="label">Nivel de sensibilidad</div></div>
+        <div class="kpi"><div class="value">${r.risk_score}<span class="muted" style="font-size:16px">/100</span></div><div class="label">Puntaje de riesgo</div></div>
+      </div>
+      <div class="form-row" style="align-items:start">
+        <div class="panel"><h2>Probabilidad por categoría</h2>${renderScores(r.category_scores)}</div>
+        <div class="panel"><h2>Datos sensibles</h2>${renderFindings(r.sensitive_findings)}</div>
+      </div>`;
+  } catch (error) { showToast(error.message, true); }
+  finally { button.disabled = false; button.textContent = "Analizar"; }
+});
+
+/* ---------- Users ---------- */
+async function loadUsers() {
+  try {
+    state.users = await api("/api/users");
+    $("#users-table").innerHTML = `<div class="table-wrap"><table>
+      <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+      <tbody>${state.users.map((u) => `<tr style="cursor:default">
+        <td class="mono">${escapeHtml(u.username)}</td><td>${escapeHtml(u.full_name) || '<span class="muted">—</span>'}</td>
+        <td><select data-role="${u.id}" aria-label="Rol de ${escapeHtml(u.username)}" style="width:auto">${Object.entries(ROLE_LABELS).map(([v, l]) => `<option value="${v}" ${u.role === v ? "selected" : ""}>${l}</option>`).join("")}</select></td>
+        <td>${u.is_active ? '<span class="ok">● Activo</span>' : '<span class="fail">● Inactivo</span>'}</td>
+        <td style="text-align:right"><button class="btn btn-ghost btn-sm" data-toggle="${u.id}" data-active="${u.is_active}">${u.is_active ? "Desactivar" : "Activar"}</button></td>
+      </tr>`).join("")}</tbody></table></div>`;
+    document.querySelectorAll("[data-role]").forEach((sel) => sel.addEventListener("change", () => updateUser(sel.dataset.role, { role: sel.value })));
+    document.querySelectorAll("[data-toggle]").forEach((btn) => btn.addEventListener("click", () => updateUser(btn.dataset.toggle, { is_active: btn.dataset.active !== "true" })));
+  } catch (error) { $("#users-table").innerHTML = `<p class="fail">${escapeHtml(error.message)}</p>`; }
+}
+async function updateUser(id, json) {
+  try { await api(`/api/users/${id}`, { method: "PATCH", json }); showToast("Usuario actualizado ✓"); }
+  catch (error) { showToast(error.message, true); }
+  loadUsers();
+}
+$("#user-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const json = { username: $("#nu-user").value.trim(), full_name: $("#nu-name").value.trim(), password: $("#nu-pass").value, role: $("#nu-role").value };
+  try { await api("/api/users", { method: "POST", json }); showToast("Usuario creado ✓"); e.target.reset(); loadUsers(); }
+  catch (error) { showToast(error.message, true); }
+});
+
+/* ---------- Audit ---------- */
+async function loadAudit() {
+  try {
+    const entries = await api("/api/audit?limit=200" + ($("#only-failed").checked ? "&only_failed=true" : ""));
+    if (!entries.length) { $("#audit-table").innerHTML = `<div class="empty"><h3>Sin registros</h3></div>`; return; }
+    $("#audit-table").innerHTML = `<div class="table-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Usuario</th><th>Acción</th><th>Resultado</th><th>IP</th><th>Detalle</th></tr></thead>
+      <tbody>${entries.map((a) => `<tr style="cursor:default">
+        <td class="mono muted">${formatDate(a.timestamp)}</td><td class="mono">${escapeHtml(a.username)}</td>
+        <td>${ACTION_LABELS[a.action] || escapeHtml(a.action)}</td>
+        <td>${a.success ? '<span class="ok">● OK</span>' : '<span class="fail">● Fallido</span>'}</td>
+        <td class="mono muted">${escapeHtml(a.ip_address)}</td><td class="muted" style="font-size:13px">${escapeHtml(a.detail)}</td>
+      </tr>`).join("")}</tbody></table></div>`;
+  } catch (error) { $("#audit-table").innerHTML = `<p class="fail">${escapeHtml(error.message)}</p>`; }
+}
+$("#only-failed").addEventListener("change", loadAudit);
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+FACTURA DE VENTA No. FV-0045
+Proveedor: Soluciones TIC S.A.S. - NIT 900.123.456-8
+Dirección: Calle 18 # 25-40, Pasto
+Concepto: licencias de software. Subtotal 2.000.000, IVA 19% 380.000, total 2.380.000.
+Condiciones de pago a 30 días. Pago con tarjeta corporativa 4111 1111 1111 1111.

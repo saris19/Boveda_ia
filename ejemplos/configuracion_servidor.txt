@@ -1,0 +1,4 @@
+Guía de despliegue del servidor de aplicaciones
+1. Instalar Docker y configurar la base de datos PostgreSQL.
+2. Reglas del firewall: permitir puerto 443, bloquear 22 desde redes externas. Configurar VPN.
+3. Variables de entorno: DB_USER=app  password=Pr0d#2026!
