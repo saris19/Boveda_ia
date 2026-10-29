@@ -1,173 +1,197 @@
 # Bóveda IA — Sistema de bodega de documentos encriptados con IA
 
-**Avance: 40 %** · Python 3.10+ · FastAPI · SQLite · AES-256-GCM · scikit-learn
+**Versión 1.0 · Avance: 100 %** · Backend: Python + FastAPI · Frontend: React + Vite · AES-256-GCM · scikit-learn
 
 Plataforma para almacenar, organizar y proteger documentos digitales. Cada archivo se cifra antes de
-guardarse, el acceso se controla por roles y permisos por documento, y un módulo de IA clasifica el
-documento y detecta información sensible en el momento de subirlo.
-
----
-
-## 1. Qué incluye este 40 %
-
-| Módulo | Estado | Detalle |
-|---|---|---|
-| Autenticación | ✅ | Login con JWT, contraseñas con bcrypt, política de contraseñas, bloqueo tras 5 intentos fallidos (anti fuerza bruta) |
-| Roles (RBAC) | ✅ | `admin` (todo), `editor` (sube, comparte, elimina lo suyo), `viewer`/lector (solo lo que le comparten) |
-| Cifrado | ✅ | Cifrado de sobre AES-256-GCM: llave aleatoria por documento, envuelta con una llave maestra. Verificación de integridad con SHA-256 |
-| Gestión de documentos | ✅ | Subir, listar, ver, descargar (descifrar), compartir con usuario o rol, revocar, eliminar |
-| Bitácora de accesos | ✅ | Registra inicios de sesión, descargas, accesos denegados, cambios de permisos (IP, navegador, resultado) |
-| IA: clasificación | ✅ | TF-IDF + Naive Bayes en 7 categorías: Financiero, Legal, Recursos Humanos, Salud, Técnico/TI, Académico, Administrativo |
-| IA: datos sensibles | ✅ | Cédula, NIT (con dígito de verificación), tarjetas (algoritmo de Luhn), cuentas bancarias, correos, teléfonos, direcciones, contraseñas, fechas de nacimiento, datos de salud y datos sensibles de la Ley 1581 de 2012. Calcula un puntaje de riesgo y un nivel: público / interno / confidencial / restringido |
-| Interfaz web | ✅ | Login, documentos, análisis con IA, usuarios y bitácora |
-| Pruebas | ✅ | 9 pruebas automáticas con pytest |
-
-### Pendiente (60 % restante)
-
-- IA: **detección de accesos sospechosos** (modelo de anomalías, p. ej. Isolation Forest, sobre la bitácora que ya se está registrando: horarios inusuales, descargas masivas, IP nuevas, accesos denegados repetidos).
-- IA: **búsqueda inteligente** (búsqueda semántica por similitud sobre las palabras clave y categorías ya calculadas).
-- Reglas de acceso según nivel de sensibilidad, alertas al administrador, rotación de llave maestra, reentrenamiento del clasificador con documentos reales.
-
----
-
-## 2. Arquitectura
+guardarse, el acceso se controla por roles, permisos por documento y nivel de sensibilidad, y la
+inteligencia artificial clasifica los documentos, detecta información sensible, permite **buscar dentro de
+los archivos cifrados** y **detecta accesos sospechosos**.
 
 ```
-Navegador (frontend/index.html — local o en Vercel)
-        │  JWT
-        ▼
-FastAPI (app/main.py)
- ├── routers/auth.py        login, bloqueo por fuerza bruta
- ├── routers/users.py       usuarios, roles, bitácora
- └── routers/documents.py   subir / descargar / compartir / eliminar
-        │
-        ├── ai/text_extractor.py     txt, md, csv, pdf, docx → texto (solo en memoria)
-        ├── ai/classifier.py         TF-IDF + Naive Bayes → categoría + palabras clave
-        ├── ai/sensitive_detector.py regex + validadores → hallazgos enmascarados + riesgo
-        ├── crypto/vault_crypto.py   AES-256-GCM, cifrado de sobre
-        ├── services/permission_service.py  reglas de acceso
-        └── services/audit_service.py       bitácora
-        │
-        ▼
-data/vault.db (SQLite: metadatos, llaves envueltas, bitácora)
-data/storage/*.enc (solo texto cifrado; en Render se guarda en la tabla encrypted_blobs)
-data/master.key (llave maestra — NO se sube a ningún repositorio)
+boveda-ia/
+├── backend/     API REST (FastAPI) → Render
+│   ├── app/ai/         clasificador, datos sensibles, índice ciego, detector de anomalías
+│   ├── app/crypto/     cifrado AES-256-GCM y llavero con rotación
+│   ├── app/routers/    endpoints (documentos, búsqueda, alertas, papelera, administración…)
+│   ├── app/services/   permisos, políticas, alertas, bitácora, almacenamiento
+│   ├── scripts/simulate_attacks.py   demostración de ataques reales contra la API
+│   └── tests/          22 pruebas automáticas
+├── frontend/    Interfaz web (React + Vite) → Vercel
+├── ejemplos/    Documentos de prueba para la demostración
+├── render.yaml  Blueprint de Render (API + PostgreSQL)
+└── DESPLIEGUE.md
 ```
-
-### Flujo al subir un documento
-
-1. Se valida extensión (.txt, .md, .csv, .pdf, .docx) y tamaño (máx. 10 MB).
-2. Se extrae el texto **en memoria** y la IA lo clasifica y busca datos sensibles.
-3. Se genera una llave AES-256 aleatoria para ese documento y se cifra el archivo (AES-GCM).
-4. La llave del documento se cifra con la llave maestra y solo esa versión cifrada se guarda en la BD.
-5. En disco queda únicamente `data/storage/<id>.enc`. En la BD solo quedan los hallazgos **enmascarados** (`*******8901`), nunca el dato real.
-
-El ID del documento se usa como *Associated Data* de AES-GCM: si alguien cambia el archivo cifrado o lo
-intercambia con el de otro documento, el descifrado falla y la descarga se bloquea.
 
 ---
 
-## 3. Instalación (Anaconda)
+## 1. Funcionalidades
 
-Abre **Anaconda Prompt** en la carpeta del proyecto:
+| Módulo | Detalle |
+|---|---|
+| Autenticación | JWT, contraseñas con bcrypt, política de contraseñas, bloqueo tras 5 intentos fallidos |
+| Roles (RBAC) | `admin` (todo), `editor` (sube, comparte, elimina lo suyo), `viewer`/lector (solo lo que le comparten) |
+| **Políticas por sensibilidad** | Confidencial: no se comparte con todo el rol Lector. Restringido: solo con usuarios con nombre propio. Se aplican al instante si la sensibilidad cambia |
+| Cifrado | Cifrado de sobre AES-256-GCM: llave aleatoria por documento y por versión; integridad SHA-256; datos asociados que impiden intercambiar archivos cifrados |
+| **Llavero y rotación** | Llave raíz (entorno) → llave maestra versionada (BD) → llave de cada documento. Rotar re-envuelve todas las llaves sin tocar el contenido cifrado |
+| Gestión documental | Subir, listar, descargar, compartir, revocar |
+| **Versiones** | Historial cifrado de cada documento; descargar o restaurar cualquier versión sin perder el historial |
+| **Papelera** | Borrado suave con restauración durante 30 días y purga automática de todas las versiones |
+| IA: clasificación | TF-IDF de palabras y caracteres + regresión logística en 7 categorías (exactitud por validación cruzada ≈ 71 %) |
+| **IA: aprendizaje con correcciones** | Las personas corrigen la categoría; el modelo se reentrena con esas correcciones (guardando solo palabras comunes, sin nombres ni números) |
+| IA: datos sensibles | Cédula, NIT, tarjetas (Luhn), cuentas, correos, teléfonos, direcciones, contraseñas, salud, Ley 1581 de 2012; valores enmascarados |
+| IA: búsqueda inteligente | Busca dentro del contenido cifrado con un índice ciego HMAC; tolera plurales y errores; entiende la intención de la búsqueda |
+| **IA: accesos sospechosos** | 7 reglas explicables + modelo **Isolation Forest** sobre la bitácora, con alertas, gestión de estados y respuestas automáticas |
+| Panel e interfaz | Indicadores, gráficas, centro de seguridad, tema claro/oscuro, versión celular |
+| Bitácora | Todas las acciones con usuario, IP, resultado y detalle |
+
+---
+
+## 2. Detección de accesos sospechosos
+
+Cada evento de la bitácora pasa por dos capas justo después de registrarse:
+
+**Reglas** (ataques conocidos, fáciles de explicar):
+
+| Regla | Condición | Severidad | Respuesta automática |
+|---|---|---|---|
+| Fuerza bruta | ≥ 3 inicios fallidos del mismo usuario en 10 min | alta / crítica (≥ 5) | Cuenta bloqueada 15 min |
+| Ataque desde una IP | Una IP falla con ≥ 3 usuarios distintos en 10 min | crítica | IP bloqueada para iniciar sesión 15 min |
+| Descarga masiva | ≥ 10 descargas en 10 min | alta / crítica (si hay restringidos) | Descargas del usuario pausadas 15 min |
+| Accesos denegados | ≥ 3 intentos sin permiso en 10 min | media / alta | — |
+| Fuera de horario | Documento confidencial o restringido entre 22:00 y 06:00 | media | — |
+| IP nueva | Inicio de sesión desde una IP nunca usada | baja | — |
+| Exploración masiva | ≥ 25 búsquedas o consultas en 5 min | media | — |
+
+**Modelo de IA (Isolation Forest, 200 árboles)**: convierte cada evento en 12 variables de comportamiento
+(hora, fin de semana, tipo de acción, fallos, acciones en 10 min, descargas y documentos distintos en 1 h,
+IP nueva, sensibilidad del documento, desvío del horario habitual del usuario) y marca como anómalo lo
+que se aleja del comportamiento normal (puntaje ≥ 60/100). Cada alerta explica qué variables la causaron.
+Arranca con una línea base sintética de comportamiento normal (arranque en frío) y se reentrena con la
+bitácora real cada 200 eventos o cuando el administrador lo pida.
+
+Las alertas iguales en 30 minutos se agrupan (no inundan el panel) y el administrador las marca como
+*en revisión*, *resueltas* o *falso positivo*.
+
+**Demostración:** con la API encendida, en otra terminal:
 
 ```bash
-conda create -n boveda python=3.11 -y
+cd backend
+python scripts/simulate_attacks.py
+```
+
+Hace peticiones reales (fuerza bruta, descarga masiva, accesos denegados y exploración) y muestra las
+alertas generadas. Contra Render: `python scripts/simulate_attacks.py --api https://boveda-ia-api.onrender.com --admin-password TU_CLAVE`.
+
+---
+
+## 3. Búsqueda inteligente (índice ciego)
+
+El texto de los documentos nunca se guarda. Cada palabra relevante se normaliza (`facturas → factur`) y se
+transforma con HMAC-SHA256 usando una llave derivada de la llave raíz. Al buscar, las palabras de la
+consulta pasan por la misma transformación. La relevancia combina contenido cifrado (55 %), metadatos con
+tolerancia a errores (35 %) e intención detectada por el clasificador (10 %).
+
+---
+
+## 4. Ejecutar en tu computador
+
+Necesitas **Python 3.10+** (Anaconda sirve) y **Node.js 18+**. Usa dos terminales.
+
+**Terminal 1 — API**
+
+```bash
+cd backend
+conda create -n boveda python=3.11 -y     # solo la primera vez
 conda activate boveda
-pip install -r requirements-dev.txt
-```
-
-## 4. Ejecución
-
-**Opción A — Anaconda Prompt**
-
-```bash
+pip install -r requirements-dev.txt        # solo la primera vez
 python run.py
 ```
 
-**Opción B — Spyder**: abre `run.py` y presiona **F5**. El servidor queda corriendo en segundo plano;
-para detenerlo, reinicia el kernel (Consola → Reiniciar kernel). En Spyder, selecciona el intérprete del
-entorno `boveda` (Herramientas → Preferencias → Intérprete de Python).
+API en <http://127.0.0.1:8000> y documentación interactiva en <http://127.0.0.1:8000/docs>.
 
-Luego abre:
+**Terminal 2 — Interfaz web**
 
-- Aplicación: <http://127.0.0.1:8000>
-- Documentación interactiva de la API (Swagger): <http://127.0.0.1:8000/docs>
+```bash
+cd frontend
+npm install        # solo la primera vez
+npm run dev
+```
 
-Usuario inicial: **admin** / **Admin123\*** (créalo distinto con las variables `VAULT_ADMIN_USER` y `VAULT_ADMIN_PASSWORD`).
+Abre <http://localhost:5173>. Usuario inicial: **admin** / **Admin123\***.
 
-## 5. Demostración sugerida
+## 5. Guion de demostración
 
-1. Entra como `admin`, ve a **Usuarios** y crea un `editor` y un `lector`.
-2. En **Documentos**, sube los archivos de la carpeta `ejemplos/`. Cada uno queda clasificado y con nivel de sensibilidad:
-
-| Archivo | Categoría | Sensibilidad |
-|---|---|---|
-| acta_reunion.txt | Administrativo | Público |
-| propuesta_grado.docx | Académico | Público |
-| historia_clinica.txt | Salud | Confidencial |
-| certificado_laboral.txt | Recursos Humanos | Restringido |
-| factura_proveedor.txt | Financiero | Restringido |
-| configuracion_servidor.txt | Técnico / TI | Restringido |
-
-3. Abre `data/storage/` y muestra que los archivos `.enc` son ilegibles.
-4. Inicia sesión como el lector: no ve nada. Como admin, comparte un documento con él y vuelve a entrar: ahora puede descargarlo.
-5. Intenta entrar 5 veces con una contraseña errada: la cuenta se bloquea. Revisa todo en **Bitácora** (filtro *Solo fallidos*).
+1. **Usuarios y roles:** crea un editor y un lector.
+2. **Documentos:** sube los archivos de `ejemplos/`. Cada uno queda cifrado, clasificado y con nivel de sensibilidad.
+3. **Detalle de un documento:** sube una nueva versión, corrige la clasificación y comparte. Observa que un
+   documento restringido no se puede compartir con un rol completo.
+4. **Búsqueda inteligente:** `losartán` (palabra solo dentro del archivo), `facturas`, `certificdo`, `pago a proveedores`.
+5. **Ataques:** ejecuta `python scripts/simulate_attacks.py` y abre **Alertas de seguridad**: verás fuerza
+   bruta, descarga masiva con descargas pausadas, accesos denegados, exploración y anomalías de la IA.
+6. **Usuarios y roles:** los usuarios afectados muestran *Cuenta bloqueada* o *Descargas pausadas* y se pueden desbloquear.
+7. **Centro de seguridad:** rota la llave maestra y comprueba que todo se sigue descargando.
+8. **Papelera:** envía un documento a la papelera y restáuralo.
 
 ## 6. Pruebas
 
 ```bash
+cd backend
 python -m pytest -v
 ```
 
-Para correrlas contra PostgreSQL en modo producción: define `VAULT_DATABASE_URL`, `VAULT_STORAGE_BACKEND=database`,
-`VAULT_ENV=production`, `VAULT_MASTER_KEY`, `VAULT_JWT_SECRET` y `VAULT_ADMIN_PASSWORD` antes de ejecutar pytest.
-
-Cubren: cifrado/descifrado, detección de manipulación, intercambio de archivos cifrados, validadores (Luhn,
-NIT), enmascaramiento, flujo completo de roles y permisos, bloqueo por fuerza bruta y lectura de .docx.
+22 pruebas: cifrado y manipulación, validadores, enmascaramiento, roles y permisos, políticas por
+sensibilidad, fuerza bruta, versiones, papelera, correcciones y reentrenamiento, rotación de llaves,
+índice ciego y búsqueda, panel, migraciones, reglas de detección, respuestas automáticas, modelo
+Isolation Forest y gestión de alertas. También pasan contra PostgreSQL en modo producción.
 
 ## 7. API principal
 
 | Método | Ruta | Rol |
 |---|---|---|
 | POST | `/api/auth/login` | público |
-| GET | `/api/auth/me` | autenticado |
-| GET / POST | `/api/users` | admin (GET también editor) |
-| PATCH | `/api/users/{id}` | admin |
+| GET | `/api/stats` · `/api/search` | autenticado |
+| GET / POST | `/api/documents` | autenticado / admin, editor |
+| GET | `/api/documents/{id}/download` | permiso de lectura |
+| GET / POST | `/api/documents/{id}/versions` | lectura / gestión |
+| GET · POST | `/api/documents/{id}/versions/{n}/download` · `/restore` | lectura · gestión |
+| PATCH | `/api/documents/{id}/classification` | gestión (admin, editor) |
+| POST · DELETE | `/api/documents/{id}/share` · `/permissions/{pid}` | gestión |
+| DELETE | `/api/documents/{id}` (a la papelera) | gestión |
+| GET · POST · DELETE | `/api/trash` · `/api/trash/{id}/restore` · `/api/trash/{id}` | propietario, admin |
+| GET · PATCH | `/api/alerts` · `/api/alerts/summary` · `/api/alerts/{id}` | admin |
+| POST | `/api/alerts/model/retrain` | admin |
+| GET · POST | `/api/admin/security` · `/api/admin/rotate-key` · `/api/admin/classifier/retrain` | admin |
+| GET / POST / PATCH | `/api/users` · `/api/users/{id}` · `/api/users/{id}/unblock` | admin |
 | GET | `/api/audit` | admin |
-| POST | `/api/documents` | admin, editor |
-| POST | `/api/documents/analyze` | autenticado |
-| GET | `/api/documents` | autenticado (solo los accesibles) |
-| GET | `/api/documents/{id}` · `/download` | con permiso de lectura |
-| POST | `/api/documents/{id}/share` | con permiso de gestión |
-| GET / DELETE | `/api/documents/{id}/permissions[/{pid}]` | con permiso de gestión |
-| DELETE | `/api/documents/{id}` | con permiso de gestión (no lectores) |
 
-## Despliegue en Render + Vercel
-
-Ver **[DESPLIEGUE.md](DESPLIEGUE.md)**.
-
-## 8. Configuración (variables de entorno opcionales)
+## 8. Configuración del backend (variables de entorno)
 
 | Variable | Uso | Por defecto |
 |---|---|---|
-| `VAULT_MASTER_KEY` | Llave maestra en base64 (32 bytes) | se genera en `data/master.key` |
-| `VAULT_JWT_SECRET` | Secreto para firmar tokens | se genera en `data/jwt.secret` |
-| `VAULT_DATA_DIR` | Carpeta de datos | `./data` |
-| `VAULT_TOKEN_MINUTES` | Duración de la sesión | 60 |
-| `VAULT_MAX_UPLOAD_MB` | Tamaño máximo de archivo | 10 |
+| `VAULT_MASTER_KEY` | Llave raíz en base64 (32 bytes) | se genera en `backend/data/master.key` |
+| `VAULT_JWT_SECRET` | Secreto para firmar tokens | se genera en `backend/data/jwt.secret` |
+| `VAULT_ADMIN_USER` / `VAULT_ADMIN_PASSWORD` | Administrador inicial | `admin` / `Admin123*` |
 | `VAULT_ENV` | `production` exige llaves y PostgreSQL definidos | `development` |
 | `DATABASE_URL` | Conexión PostgreSQL (la pone Render) | SQLite local |
-| `VAULT_STORAGE_BACKEND` | `disk` o `database` | `disk` (local) / `database` (producción) |
-| `VAULT_CORS_ORIGINS` | Orígenes permitidos, separados por coma (URL de Vercel) | — |
-| `VAULT_CORS_ORIGIN_REGEX` | Regex opcional para las vistas previas de Vercel | — |
+| `VAULT_STORAGE_BACKEND` | `disk` o `database` | `disk` local / `database` producción |
+| `VAULT_CORS_ORIGINS` · `VAULT_CORS_ORIGIN_REGEX` | Orígenes del frontend permitidos | — |
+| `VAULT_TIMEZONE` | Zona horaria para la regla de horario | `America/Bogota` |
+| `VAULT_OFF_HOURS_START` · `VAULT_OFF_HOURS_END` | Horario no laboral | 22 · 6 |
+| `VAULT_TRASH_DAYS` | Días en la papelera | 30 |
+| `VAULT_DOWNLOAD_BLOCK_MINUTES` | Pausa de descargas tras descarga masiva | 15 |
+| `VAULT_TOKEN_MINUTES` · `VAULT_MAX_UPLOAD_MB` | Duración de sesión · tamaño máximo | 60 · 10 |
 
-> ⚠️ Si se pierde `data/master.key`, los documentos **no se pueden recuperar**. En producción, la llave
-> maestra debería estar en un gestor de secretos (KMS, HashiCorp Vault, Azure Key Vault).
+> ⚠️ Si se pierde la llave raíz (`VAULT_MASTER_KEY`), los documentos **no se pueden recuperar**.
 
-## 9. Limitaciones conocidas del prototipo
+## 9. Despliegue
 
-- El clasificador se entrena con un corpus semilla pequeño (`app/ai/training_data.py`, 84 ejemplos); su precisión mejora con documentos reales etiquetados.
-- La detección de datos sensibles se basa en patrones; no reconoce nombres propios (eso requeriría un modelo NER, p. ej. spaCy).
-- Los PDF escaneados (imágenes) no tienen texto extraíble sin OCR.
-- El token se guarda solo en memoria del navegador: al recargar la página hay que iniciar sesión de nuevo.
+API en Render y frontend en Vercel: ver **[DESPLIEGUE.md](DESPLIEGUE.md)**. Las bases de datos de
+versiones anteriores se actualizan solas al arrancar (migraciones automáticas).
+
+## 10. Limitaciones conocidas
+
+- El clasificador parte de 210 ejemplos semilla; mejora con las correcciones de los usuarios.
+- La detección de datos sensibles se basa en patrones; no reconoce nombres propios (requeriría un modelo NER).
+- Los PDF escaneados no tienen texto extraíble sin OCR.
+- El modelo de anomalías vive en memoria: se reentrena al arrancar y periódicamente desde la bitácora.
+- El índice ciego revela si dos documentos comparten una palabra (no cuál) a quien acceda a la base de datos.

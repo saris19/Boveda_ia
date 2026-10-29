@@ -1,5 +1,17 @@
-data/
+# Python
 __pycache__/
 *.pyc
 .pytest_cache/
+.venv/
+venv/
+backend/data/
+data/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Secrets
 .env
+.env.local
+*.key
